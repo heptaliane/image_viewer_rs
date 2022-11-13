@@ -13,14 +13,10 @@ extern "C" {
 
 fn fetch_next_image_source(source: RefCell<String>) {
     spawn_local(async move {
-        match get_next_image().await {
-            Ok(data) => match data.as_string() {
-                Some(src) => {
-                    source.replace(src);
-                }
-                _ => (),
-            },
-            _ => (),
+        if let Ok(data) = get_next_image().await {
+            if let Some(src) = data.as_string() {
+                source.replace(src);
+            }
         }
     });
 }
