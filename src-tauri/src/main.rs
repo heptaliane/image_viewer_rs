@@ -3,6 +3,8 @@
   windows_subsystem = "windows"
 )]
 
+mod image;
+
 fn main() {
   tauri::Builder::default()
       .invoke_handler(tauri::generate_handler![move_image_offset])
@@ -12,5 +14,6 @@ fn main() {
 
 #[tauri::command]
 fn move_image_offset(moves: &str) -> Result<String, String> {
-    Ok("./sample.png".to_string())
+    let filename = "../sample.png".to_string();
+    image::try_get_source_image(filename)
 }
