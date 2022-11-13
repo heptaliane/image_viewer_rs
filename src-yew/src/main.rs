@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 use gloo::events::EventListener;
+use wasm_logger;
 use wasm_bindgen::{JsCast, UnwrapThrowExt};
 use web_sys::KeyboardEvent;
 use yew::prelude::*;
@@ -72,5 +73,6 @@ impl Component for ImageViewModel {
 }
 
 fn main() {
+    wasm_logger::init(wasm_logger::Config::default());
     yew::start_app::<ImageViewModel>();
 }

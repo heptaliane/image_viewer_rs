@@ -7,16 +7,20 @@ use wasm_bindgen_futures::spawn_local;
 
 #[wasm_bindgen(module = "/public/glue.js")]
 extern "C" {
-    #[wasm_bindgen(js_name = getNextImage, catch)]
-    pub async fn get_next_image() -> Result<JsValue, JsValue>;
+    #[wasm_bindgen(js_name = moveImageOffset, catch)]
+    pub async fn move_image_offset(moves: &str) -> Result<JsValue, JsValue>;
 }
 
 fn fetch_next_image_source(source: RefCell<String>) {
     spawn_local(async move {
-        if let Ok(data) = get_next_image().await {
-            if let Some(src) = data.as_string() {
-                source.replace(src);
+        match move_image_offset("1").await {
+            Ok(data) => {
+                if let Some(src) = data.as_string() {
+                    log::info!("{}", src);
+                    source.replace(src);
+                }
             }
+            Err(e) => log::error!("{:?}", e),
         }
     });
 }
