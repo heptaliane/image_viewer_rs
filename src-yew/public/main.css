@@ -1,11 +1,24 @@
 img {
     object-fit: contain;
     margin: auto;
+    height: 100%;
+    width: 100%;
 }
 
 .container {
     position: absolute;
     top: 0;
     bottom: 0;
+    left: 0;
+    text-align: center;
+    vertical-align: middle;
     width: 100%;
+    background-color: lightgray;
+    background-image:
+        linear-gradient(45deg, gray 25%, transparent 25%, transparent 75%, gray 75%, gray),
+        linear-gradient(45deg, gray 25%, transparent 25%, transparent 75%, gray 75%, gray);
+    background-position:
+        0px 0px,
+        10px 10px;
+    background-size: 20px 20px;
 }
