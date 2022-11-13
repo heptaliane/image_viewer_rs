@@ -3,8 +3,8 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 use gloo::events::EventListener;
-use wasm_logger;
 use wasm_bindgen::{JsCast, UnwrapThrowExt};
+use wasm_logger;
 use web_sys::KeyboardEvent;
 use yew::prelude::*;
 
@@ -14,11 +14,12 @@ const DEFAULT_KEYMAP: [(&str, &str); 1] = [("ArrowRight", "NEXT_IMAGE")];
 
 enum ImageViewMsg {
     OnKeyPress(KeyboardEvent),
+    OnSourceChange(String),
 }
 
 struct ImageViewModel {
     source: RefCell<String>,
-    keymap: HashMap<String, Box<&'static dyn Fn(RefCell<String>) -> ()>>,
+    keymap: HashMap<String, Box<&'static dyn Fn(Callback<String>) -> ()>>,
     keybord_listener: Option<EventListener>,
 }
 
@@ -39,14 +40,23 @@ impl Component for ImageViewModel {
         }
     }
 
-    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
-            Self::Message::OnKeyPress(e) => match self.keymap.get(&e.key()) {
-                Some(action) => action(self.source.clone()),
-                _ => (),
-            },
+            Self::Message::OnKeyPress(e) => {
+                let set_source = ctx
+                    .link()
+                    .callback(|src: String| Self::Message::OnSourceChange(src));
+                match self.keymap.get(&e.key()) {
+                    Some(action) => action(set_source),
+                    _ => (),
+                }
+            }
+            Self::Message::OnSourceChange(src) => {
+                self.source.replace(src);
+                return true;
+            }
         }
-        true
+        false
     }
 
     fn view(&self, _ctx: &Context<Self>) -> Html {
@@ -61,8 +71,17 @@ impl Component for ImageViewModel {
 
     fn rendered(&mut self, ctx: &Context<Self>, first_render: bool) {
         if first_render {
+            // Fetch first image
+            let set_source = ctx
+                .link()
+                .callback(|src: String| Self::Message::OnSourceChange(src));
+            key_action::fetch_current_image_source(set_source);
+
+            // Set key event listener
             let document = gloo::utils::document();
-            let onkeydown = ctx.link().callback(|e: KeyboardEvent| Self::Message::OnKeyPress(e));
+            let onkeydown = ctx
+                .link()
+                .callback(|e: KeyboardEvent| Self::Message::OnKeyPress(e));
             let listener = EventListener::new(&document, "keydown", move |e| {
                 let event = e.dyn_ref::<KeyboardEvent>().unwrap_throw();
                 onkeydown.emit(event.clone());
