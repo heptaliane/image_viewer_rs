@@ -1,0 +1,281 @@
+use std::path::{Path, PathBuf};
+
+pub struct ViewerState {
+    pub filenames: Vec<String>,
+    pub cursor: usize,
+}
+
+enum GetNextDirectoryResult {
+    DIRECTORY_FOUND(String),
+    PARENT_NOT_FOUND,
+    ACCESS_DENIED,
+    NO_BROTHER_LEFT,
+}
+
+fn get_children<F>(parent: &Path, predicate: F) -> Result<Vec<String>, ()>
+where
+    F: Fn(&PathBuf) -> bool,
+{
+    match parent.read_dir() {
+        Ok(dirs) => {
+            let mut directories: Vec<String> = dirs
+                .filter(|path| match path {
+                    Ok(_) => true,
+                    _ => false,
+                })
+                .map(|path| path.unwrap().path())
+                .filter(predicate)
+                .map(|path| path.to_str().unwrap().to_string())
+                .collect();
+            directories.sort();
+            Ok(directories)
+        }
+        _ => Err(()),
+    }
+}
+
+fn get_child_dirs(parent: &Path) -> Result<Vec<String>, ()> {
+    get_children(parent, |path| path.is_dir())
+}
+
+fn get_child_files(parent: &Path) -> Result<Vec<String>, ()> {
+    get_children(parent, |path| path.is_file())
+}
+
+fn get_deep_child_dir(parent: &Path, head: bool) -> Option<String> {
+    let mut current = parent.to_str().unwrap().to_string();
+
+    loop {
+        if !head {
+            let result = get_child_files(&Path::new(&current));
+            match result {
+                Ok(files) => {
+                    if files.len() > 0 {
+                        return Some(current);
+                    }
+                }
+                _ => return None,
+            }
+        }
+
+        let result = get_child_dirs(&Path::new(&current));
+        match result {
+            Ok(dirs) => {
+                if dirs.len() == 0 {
+                    return Some(current);
+                }
+
+                current = match head {
+                    true => dirs.first().unwrap().clone(),
+                    false => dirs.last().unwrap().clone(),
+                };
+            }
+            _ => return None,
+        }
+    }
+}
+
+fn get_next_directory(dirpath: &String, increase: bool) -> GetNextDirectoryResult {
+    match Path::new(dirpath).parent() {
+        Some(parent) => match get_child_dirs(&parent) {
+            Ok(dirs) => {
+                let idx = dirs.iter().position(|path| path == dirpath).unwrap();
+
+                if increase {
+                    match dirs.get(idx + 1) {
+                        Some(dir) => GetNextDirectoryResult::DIRECTORY_FOUND(dir.clone()),
+                        None => GetNextDirectoryResult::NO_BROTHER_LEFT,
+                    }
+                } else {
+                    match idx {
+                        0 => GetNextDirectoryResult::NO_BROTHER_LEFT,
+                        _ => {
+                            let next_idx = ((idx as i32) - 1) as usize;
+                            GetNextDirectoryResult::DIRECTORY_FOUND(dirs[next_idx].clone())
+                        }
+                    }
+                }
+            }
+            _ => GetNextDirectoryResult::ACCESS_DENIED,
+        },
+        None => GetNextDirectoryResult::PARENT_NOT_FOUND,
+    }
+}
+
+fn change_directory(dirpath: &String, increase: bool) -> Option<String> {
+    let mut current = dirpath.clone();
+
+    if !increase {
+        if let Ok(children) = get_child_dirs(&Path::new(&current)) {
+            if children.len() > 0 {
+                current = children.last().unwrap().clone();
+            }
+        }
+    }
+
+    loop {
+        match get_next_directory(&current, increase) {
+            GetNextDirectoryResult::PARENT_NOT_FOUND => return None,
+            GetNextDirectoryResult::ACCESS_DENIED => return None,
+            GetNextDirectoryResult::DIRECTORY_FOUND(dir) => {
+                if let Some(dirname) = get_deep_child_dir(Path::new(&dir), increase) {
+                    match get_child_files(Path::new(&dirname)) {
+                        Ok(files) => {
+                            current = dirname;
+                            if files.len() > 0 {
+                                return Some(current);
+                            }
+                        }
+                        _ => return None,
+                    }
+                } else {
+                    return None;
+                }
+            }
+            GetNextDirectoryResult::NO_BROTHER_LEFT if increase => {
+                let parent = Path::new(&current).parent().unwrap();
+                let result = get_child_files(&parent);
+                current = parent.to_str().unwrap().to_string();
+
+                match result {
+                    Ok(files) => {
+                        if files.len() > 0 {
+                            return Some(current);
+                        }
+                    }
+                    _ => return None,
+                }
+            }
+            GetNextDirectoryResult::NO_BROTHER_LEFT => match Path::new(&current).parent() {
+                Some(parent) => {
+                    current = parent.to_str().unwrap().to_string();
+                }
+                _ => return None,
+            },
+        }
+    }
+}
+
+impl ViewerState {
+    pub fn get(&self) -> Option<&String> {
+        self.filenames.get(self.cursor)
+    }
+
+    pub fn set_offset(&mut self, offset: usize) {
+        self.cursor = offset
+    }
+}
+
+/*
+ * Test data structure:
+ * test_data/state/ +- a/ +- a/ +- a
+ *                  |     |     +- b
+ *                  |     |     +- c
+ *                  |     |
+ *                  |     +- b/ +- a
+ *                  |     |     +- b
+ *                  |     |     +- c
+ *                  |     +- c/
+ *                  |     +- d
+ *                  |
+ *                  +- b/ +- a/ +- a
+ *                  |     |
+ *                  |     +- b/ +- a
+ *                  |     |
+ *                  |     +- c/
+ *                  |
+ *                  +- c/ +- a
+ *                        +- b
+ *                        +- c
+ */
+#[test]
+fn test_get_child_dirs() {
+    let parent1 = Path::new("test_data/state/a/");
+    let dirs1 = get_child_dirs(&parent1);
+    assert_eq!(
+        vec![
+            "test_data/state/a/a",
+            "test_data/state/a/b",
+            "test_data/state/a/c"
+        ],
+        dirs1.expect("get_child_dirs failed")
+    );
+
+    let parent2 = Path::new("test_data/state/c");
+    let dirs2 = get_child_dirs(&parent2);
+    let expect2: Vec<String> = vec![];
+    assert_eq!(expect2, dirs2.expect("get_child_dirs failed"));
+}
+
+#[test]
+fn test_get_child_files() {
+    let parent1 = Path::new("test_data/state/a/a/");
+    let files1 = get_child_files(&parent1);
+    assert_eq!(
+        vec![
+            "test_data/state/a/a/a",
+            "test_data/state/a/a/b",
+            "test_data/state/a/a/c"
+        ],
+        files1.expect("get_child_files failed")
+    );
+
+    let parent2 = Path::new("test_data/state/a/");
+    let files2 = get_child_files(&parent2);
+    assert_eq!(
+        vec!["test_data/state/a/d"],
+        files2.expect("get_child_files failed")
+    );
+}
+
+#[test]
+fn test_get_deep_child_dir() {
+    let parent1 = Path::new("test_data/state/a");
+    let dirname1a = get_deep_child_dir(parent1, true);
+    let dirname1b = get_deep_child_dir(parent1, false);
+    assert_eq!("test_data/state/a/a", dirname1a.unwrap());
+    assert_eq!("test_data/state/a", dirname1b.unwrap());
+
+    let parent2 = Path::new("test_data/state");
+    let dirname2a = get_deep_child_dir(parent2, true);
+    let dirname2b = get_deep_child_dir(parent2, false);
+    assert_eq!("test_data/state/a/a", dirname2a.unwrap());
+    assert_eq!("test_data/state/c", dirname2b.unwrap());
+}
+
+#[test]
+fn test_change_directory() {
+    let directories = [
+        "test_data/state/a/a",
+        "test_data/state/a/b",
+        "test_data/state/a",
+        "test_data/state/b",
+        "test_data/state/c",
+    ];
+    let expects = [
+        (Some("test_data/state/a/b"), None),
+        (Some("test_data/state/a"), Some("test_data/state/a/a")),
+        (Some("test_data/state/b/a"), Some("test_data/state/a/b")),
+        (Some("test_data/state/c"), Some("test_data/state/b/b")),
+        (None, Some("test_data/state/b/b")),
+    ];
+
+    for (dir, (expect1, expect2)) in directories.iter().zip(expects.iter()) {
+        let actual1 = change_directory(&dir.to_string(), true);
+        let actual2 = change_directory(&dir.to_string(), false);
+        assert_eq!(
+            match expect1 {
+                Some(s) => Some(s.to_string()),
+                None => None,
+            },
+            actual1
+        );
+        assert_eq!(
+            match expect2 {
+                Some(s) => Some(s.to_string()),
+                None => None,
+            },
+            actual2
+        );
+    }
+}

@@ -4,6 +4,7 @@
 )]
 
 mod image;
+mod state;
 
 fn main() {
   tauri::Builder::default()
