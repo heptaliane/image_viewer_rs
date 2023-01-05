@@ -1,15 +1,10 @@
 use std::path::{Path, PathBuf};
 
-pub struct ViewerState {
-    pub filenames: Vec<String>,
-    pub cursor: usize,
-}
-
 enum GetNextDirectoryResult {
-    DIRECTORY_FOUND(String),
-    PARENT_NOT_FOUND,
-    ACCESS_DENIED,
-    NO_BROTHER_LEFT,
+    DirectoryFound(String),
+    ParentNotFound,
+    AccessDenied,
+    NoBrotherLeft,
 }
 
 fn get_children<F>(parent: &Path, predicate: F) -> Result<Vec<String>, ()>
@@ -83,22 +78,22 @@ fn get_next_directory(dirpath: &String, increase: bool) -> GetNextDirectoryResul
 
                 if increase {
                     match dirs.get(idx + 1) {
-                        Some(dir) => GetNextDirectoryResult::DIRECTORY_FOUND(dir.clone()),
-                        None => GetNextDirectoryResult::NO_BROTHER_LEFT,
+                        Some(dir) => GetNextDirectoryResult::DirectoryFound(dir.clone()),
+                        None => GetNextDirectoryResult::NoBrotherLeft,
                     }
                 } else {
                     match idx {
-                        0 => GetNextDirectoryResult::NO_BROTHER_LEFT,
+                        0 => GetNextDirectoryResult::NoBrotherLeft,
                         _ => {
                             let next_idx = ((idx as i32) - 1) as usize;
-                            GetNextDirectoryResult::DIRECTORY_FOUND(dirs[next_idx].clone())
+                            GetNextDirectoryResult::DirectoryFound(dirs[next_idx].clone())
                         }
                     }
                 }
             }
-            _ => GetNextDirectoryResult::ACCESS_DENIED,
+            _ => GetNextDirectoryResult::AccessDenied,
         },
-        None => GetNextDirectoryResult::PARENT_NOT_FOUND,
+        None => GetNextDirectoryResult::ParentNotFound,
     }
 }
 
@@ -115,9 +110,9 @@ fn change_directory(dirpath: &String, increase: bool) -> Option<String> {
 
     loop {
         match get_next_directory(&current, increase) {
-            GetNextDirectoryResult::PARENT_NOT_FOUND => return None,
-            GetNextDirectoryResult::ACCESS_DENIED => return None,
-            GetNextDirectoryResult::DIRECTORY_FOUND(dir) => {
+            GetNextDirectoryResult::ParentNotFound => return None,
+            GetNextDirectoryResult::AccessDenied => return None,
+            GetNextDirectoryResult::DirectoryFound(dir) => {
                 if let Some(dirname) = get_deep_child_dir(Path::new(&dir), increase) {
                     match get_child_files(Path::new(&dirname)) {
                         Ok(files) => {
@@ -132,7 +127,7 @@ fn change_directory(dirpath: &String, increase: bool) -> Option<String> {
                     return None;
                 }
             }
-            GetNextDirectoryResult::NO_BROTHER_LEFT if increase => {
+            GetNextDirectoryResult::NoBrotherLeft if increase => {
                 let parent = Path::new(&current).parent().unwrap();
                 let result = get_child_files(&parent);
                 current = parent.to_str().unwrap().to_string();
@@ -146,7 +141,7 @@ fn change_directory(dirpath: &String, increase: bool) -> Option<String> {
                     _ => return None,
                 }
             }
-            GetNextDirectoryResult::NO_BROTHER_LEFT => match Path::new(&current).parent() {
+            GetNextDirectoryResult::NoBrotherLeft => match Path::new(&current).parent() {
                 Some(parent) => {
                     current = parent.to_str().unwrap().to_string();
                 }
@@ -156,13 +151,65 @@ fn change_directory(dirpath: &String, increase: bool) -> Option<String> {
     }
 }
 
+pub struct ViewerState {
+    pub filenames: Vec<String>,
+    pub cursor: usize,
+}
+
 impl ViewerState {
+    pub fn new(filename: &String) -> Self {
+        let parent = Path::new(filename).parent().unwrap();
+        let filenames = get_child_files(&parent).unwrap();
+        Self {
+            filenames: filenames.clone(),
+            cursor: filenames.iter().position(|path| path == filename).unwrap(),
+        }
+    }
+
     pub fn get(&self) -> Option<&String> {
         self.filenames.get(self.cursor)
     }
 
-    pub fn set_offset(&mut self, offset: usize) {
-        self.cursor = offset
+    pub fn set_offset(&mut self, offset: i32) {
+        match offset {
+            i if i < 0 => self.prev_directory(),
+            i if (i as usize) >= self.filenames.len() => self.next_directory(),
+            i => self.cursor = i as usize,
+        }
+    }
+
+    pub fn prev_directory(&mut self) {
+        if let Some(prev_dir) = change_directory(&self.current_dir(), false) {
+            match get_child_files(&Path::new(&prev_dir)) {
+                Ok(files) => {
+                    self.filenames = files;
+                    self.cursor = self.filenames.len() - 1;
+                },
+                _ => (),
+            }
+        }
+    }
+
+    pub fn next_directory(&mut self) {
+        if let Some(next_dir) = change_directory(&self.current_dir(), true) {
+            match get_child_files(&Path::new(&next_dir)) {
+                Ok(files) => {
+                    self.filenames = files;
+                    self.cursor = 0;
+                },
+                _ => (),
+            }
+        }
+    }
+
+    pub fn move_cursor(&mut self, moves: i32) {
+        self.set_offset((self.cursor as i32) + moves);
+    }
+
+    fn current_dir(&self) -> String {
+        let filename = self.filenames.first().unwrap();
+        let current_dir = Path::new(filename).parent().unwrap();
+        return current_dir.to_str().unwrap().to_string();
     }
 }
 
@@ -278,4 +325,72 @@ fn test_change_directory() {
             actual2
         );
     }
+}
+
+#[test]
+fn test_viewer_state_init() {
+    let state1 = ViewerState::new(&"test_data/state/a/b/a".to_string());
+    let expected_filenames = vec![
+        "test_data/state/a/b/a",
+        "test_data/state/a/b/b",
+        "test_data/state/a/b/c",
+    ];
+    assert_eq!(expected_filenames, state1.filenames);
+    assert_eq!(0, state1.cursor);
+
+    let state2 = ViewerState::new(&"test_data/state/a/b/b".to_string());
+    assert_eq!(expected_filenames, state2.filenames);
+    assert_eq!(1, state2.cursor);
+}
+
+#[test]
+fn test_viewer_state_change_directory() {
+    let mut state = ViewerState::new(&"test_data/state/a/b/a".to_string());
+
+    let prev_expected = vec![
+        "test_data/state/a/a/a",
+        "test_data/state/a/a/b",
+        "test_data/state/a/a/c",
+    ];
+    state.prev_directory();
+    assert_eq!(prev_expected, state.filenames);
+
+    let next_expected = vec![
+        "test_data/state/a/b/a",
+        "test_data/state/a/b/b",
+        "test_data/state/a/b/c",
+    ];
+    state.next_directory();
+    assert_eq!(next_expected, state.filenames);
+}
+
+#[test]
+fn test_viewer_state_set_offset() {
+    let mut state = ViewerState::new(&"test_data/state/a/b/a".to_string());
+    assert_eq!("test_data/state/a/b/a", state.get().unwrap());
+
+    state.set_offset(1);
+    assert_eq!("test_data/state/a/b/b", state.get().unwrap());
+
+    state.set_offset(-1);
+    assert_eq!("test_data/state/a/a/c", state.get().unwrap());
+
+    state.set_offset(3);
+    assert_eq!("test_data/state/a/b/a", state.get().unwrap());
+}
+
+#[test]
+fn test_viewer_state_move_cursor() {
+    let mut state = ViewerState::new(&"test_data/state/a/b/a".to_string());
+    state.move_cursor(1);
+    assert_eq!("test_data/state/a/b/b", state.get().unwrap());
+
+    state.move_cursor(2);
+    assert_eq!("test_data/state/a/d", state.get().unwrap());
+
+    state.move_cursor(-1);
+    assert_eq!("test_data/state/a/b/c", state.get().unwrap());
+
+    state.move_cursor(-10);
+    assert_eq!("test_data/state/a/a/c", state.get().unwrap());
 }
