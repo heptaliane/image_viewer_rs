@@ -151,6 +151,7 @@ fn change_directory(dirpath: &String, increase: bool) -> Option<String> {
     }
 }
 
+#[derive(Default)]
 pub struct ViewerState {
     pub filenames: Vec<String>,
     pub cursor: usize,

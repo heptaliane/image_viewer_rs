@@ -4,8 +4,8 @@ use std::path::Path;
 use base64;
 use mime;
 
-pub fn try_get_source_image(filename: String) -> Result<String, String> {
-    let extension = Path::new(&filename)
+pub fn try_get_source_image(filename: &String) -> Result<String, String> {
+    let extension = Path::new(filename)
         .extension()
         .expect("").to_ascii_lowercase();
     let mimetype: mime::Mime = match extension.to_str().unwrap() {
