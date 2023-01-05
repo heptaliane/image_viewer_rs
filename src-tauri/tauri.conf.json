@@ -29,7 +29,7 @@
         "icons/icon.icns",
         "icons/icon.ico"
       ],
-      "identifier": "com.tauri.dev",
+      "identifier": "heptaliane.image-viewer",
       "longDescription": "",
       "macOS": {
         "entitlements": null,
@@ -46,6 +46,16 @@
         "digestAlgorithm": "sha256",
         "timestampUrl": ""
       }
+    },
+    "cli": {
+      "args": [
+        {
+          "name": "filename",
+          "short": "f",
+          "takesValue": true,
+          "multiple": true
+        }
+      ]
     },
     "security": {
       "csp": null
