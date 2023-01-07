@@ -1,0 +1,9 @@
+version: "3"
+services:
+  build_env:
+    build: .
+    container_name: image_viewer_rs_build_env
+    tty: true
+    volumes:
+      - .:/workspace
+    working_dir: /workspace/src-tauri
