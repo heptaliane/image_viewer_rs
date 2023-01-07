@@ -6,4 +6,8 @@ services:
     tty: true
     volumes:
       - .:/workspace
+      - /tmp/.X11-unix:/tmp/.X11-unix
     working_dir: /workspace/src-tauri
+    environment:
+      - DISPLAY=${DISPLAY}
+      - NO_AT_BRIDGE=1
