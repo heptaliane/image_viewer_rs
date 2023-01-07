@@ -5,7 +5,7 @@ Simple image viewer implemented with Tauri + Yew.
 ## Build with docker
 ### Create build image
 ``` bash
-make build
+make setup
 ```
 
 ### Build for development
