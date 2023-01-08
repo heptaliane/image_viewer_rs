@@ -5,9 +5,9 @@ services:
     container_name: image_viewer_rs_build_env
     tty: true
     volumes:
-      - .:/workspace
+      - .:/home/builder
       - /tmp/.X11-unix:/tmp/.X11-unix
-    working_dir: /workspace/src-tauri
+    working_dir: /home/builder/src-tauri
     environment:
       - DISPLAY=${DISPLAY}
       - NO_AT_BRIDGE=1
