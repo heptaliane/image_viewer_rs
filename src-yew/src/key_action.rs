@@ -16,7 +16,6 @@ fn fetch_image_source(handler: Callback<String>, moves: i32) {
         match move_image_offset(moves.to_string().as_str()).await {
             Ok(data) => {
                 if let Some(src) = data.as_string() {
-                    log::info!("{}", src);
                     handler.emit(src);
                 }
             }
@@ -33,21 +32,30 @@ fn fetch_next_image_source(handler: Callback<String>) {
     fetch_image_source(handler, 1);
 }
 
+fn fetch_prev_image_source(handler: Callback<String>) {
+    fetch_image_source(handler, -1);
+}
+
 enum KeyAction {
     NextImage,
+    PrevImage,
 }
 
 impl KeyAction {
     fn as_string(self) -> String {
         match self {
             KeyAction::NextImage => "NEXT_IMAGE",
+            KeyAction::PrevImage => "PREV_IMAGE",
         }
         .to_string()
     }
 }
 
-const KEY_ACTION_MAP: [(KeyAction, &dyn Fn(Callback<String>) -> ()); 1] =
-    [(KeyAction::NextImage, &fetch_next_image_source)];
+const KEY_ACTION_MAP: [(KeyAction, &dyn Fn(Callback<String>) -> ()); 2] =
+    [
+        (KeyAction::NextImage, &fetch_next_image_source),
+        (KeyAction::PrevImage, &fetch_prev_image_source),
+    ];
 
 pub fn create_keymap(
     keyset: HashMap<String, String>,

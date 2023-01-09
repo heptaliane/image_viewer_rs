@@ -31,13 +31,19 @@ fn move_image_offset(
 ) -> Result<String, String> {
     match moves.parse::<i32>() {
         Ok(n_moves) => match state_manager.0.lock() {
-            Ok(mut state) => {
-                state.move_cursor(n_moves);
-                match state.get() {
-                    Some(filename) => image::try_get_source_image(filename),
-                    None => Err(format!("Target not found")),
+            Ok(mut state) => loop {
+                match state.move_cursor(n_moves) {
+                    Ok(_) => (),
+                    _ => return Err("No valid image left".to_string()),
                 }
-            }
+                match state.get() {
+                    Some(filename) => match image::try_get_source_image(filename) {
+                        Ok(img) => return Ok(img),
+                        _ => (),
+                    },
+                    _ => return Err("No valid image left".to_string()),
+                }
+            },
             Err(err) => Err(format!("{:?}", err)),
         },
         Err(err) => Err(format!("{:?}", err)),

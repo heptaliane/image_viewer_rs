@@ -10,7 +10,12 @@ use yew::prelude::*;
 
 mod key_action;
 
-const DEFAULT_KEYMAP: [(&str, &str); 1] = [("ArrowRight", "NEXT_IMAGE")];
+const DEFAULT_KEYMAP: [(&str, &str); 4] = [
+    ("ArrowRight", "NEXT_IMAGE"),
+    ("l", "NEXT_IMAGE"),
+    ("ArrowLeft", "PREV_IMAGE"),
+    ("h", "PREV_IMAGE"),
+];
 
 enum ImageViewMsg {
     OnKeyPress(KeyboardEvent),

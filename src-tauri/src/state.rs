@@ -171,40 +171,47 @@ impl ViewerState {
         self.filenames.get(self.cursor)
     }
 
-    pub fn set_offset(&mut self, offset: i32) {
+    pub fn set_offset(&mut self, offset: i32) -> Result<(), ()> {
         match offset {
             i if i < 0 => self.prev_directory(),
             i if (i as usize) >= self.filenames.len() => self.next_directory(),
-            i => self.cursor = i as usize,
+            i => {
+                self.cursor = i as usize;
+                Ok(())
+            }
         }
     }
 
-    pub fn prev_directory(&mut self) {
-        if let Some(prev_dir) = change_directory(&self.current_dir(), false) {
-            match get_child_files(&Path::new(&prev_dir)) {
+    pub fn prev_directory(&mut self) -> Result<(), ()> {
+        match change_directory(&self.current_dir(), false) {
+            Some(prev_dir) => match get_child_files(&Path::new(&prev_dir)) {
                 Ok(files) => {
                     self.filenames = files;
                     self.cursor = self.filenames.len() - 1;
-                },
-                _ => (),
-            }
+                    Ok(())
+                }
+                _ => Err(()),
+            },
+            _ => Err(()),
         }
     }
 
-    pub fn next_directory(&mut self) {
-        if let Some(next_dir) = change_directory(&self.current_dir(), true) {
-            match get_child_files(&Path::new(&next_dir)) {
+    pub fn next_directory(&mut self) -> Result<(), ()> {
+        match change_directory(&self.current_dir(), true) {
+            Some(next_dir) => match get_child_files(&Path::new(&next_dir)) {
                 Ok(files) => {
                     self.filenames = files;
                     self.cursor = 0;
-                },
-                _ => (),
-            }
+                    Ok(())
+                }
+                _ => Err(()),
+            },
+            _ => Err(()),
         }
     }
 
-    pub fn move_cursor(&mut self, moves: i32) {
-        self.set_offset((self.cursor as i32) + moves);
+    pub fn move_cursor(&mut self, moves: i32) -> Result<(), ()> {
+        self.set_offset((self.cursor as i32) + moves)
     }
 
     fn current_dir(&self) -> String {
