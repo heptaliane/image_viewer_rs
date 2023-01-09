@@ -26,3 +26,5 @@ RUN rustup target add wasm32-unknown-unknown
 RUN cargo install trunk
 RUN cargo install wasm-bindgen-cli
 RUN cargo install tauri-cli
+
+ENV PATH $PATH:/home/${BUILD_USER}/.cargo/bin/

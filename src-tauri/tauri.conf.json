@@ -1,7 +1,7 @@
 {
   "build": {
-    "beforeBuildCommand": "cd ../src-yew && trunk build --release",
-    "beforeDevCommand": "cd ../src-yew && trunk serve --address 0.0.0.0 --port 8888",
+    "beforeBuildCommand": "cd src-yew && trunk build --release",
+    "beforeDevCommand": "cd src-yew && trunk serve --address 0.0.0.0 --port 8888",
     "devPath": "http://0.0.0.0:8888",
     "distDir": "../src-yew/dist",
     "withGlobalTauri": true
