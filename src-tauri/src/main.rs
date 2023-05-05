@@ -5,19 +5,33 @@
 
 use std::sync::Mutex;
 use tauri::{Manager, State};
+use serde_json::Value;
 
 mod image;
 mod state;
+mod path;
 
 struct ViewerStateManager(Mutex<state::ViewerState>);
 
 fn main() {
-    let filename = "../sample.png".to_string();
     tauri::Builder::default()
-        .setup(move |app| {
-            let state = state::ViewerState::new(&filename);
-            app.manage(ViewerStateManager(Mutex::new(state)));
-            Ok(())
+        .setup(move |app| match app.get_cli_matches() {
+            Ok(matches) => match matches.args.get("filename").unwrap().value.clone() {
+                Value::String(filename) => {
+                    let state = state::ViewerState::new(&filename);
+                    app.manage(ViewerStateManager(Mutex::new(state)));
+                    Ok(())
+                },
+                _ => {
+                    let msg = "Filename is required.";
+                    println!("{:?}", msg);
+                    Err(msg.into())
+                }
+            },
+            Err(err) => {
+                println!("{:?}", err.to_string());
+                Err(err.into())
+            }
         })
         .invoke_handler(tauri::generate_handler![move_image_offset])
         .run(tauri::generate_context!())

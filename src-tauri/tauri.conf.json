@@ -51,9 +51,8 @@
       "args": [
         {
           "name": "filename",
-          "short": "f",
-          "takesValue": true,
-          "multiple": true
+          "index": 1,
+          "takesValue": true
         }
       ]
     },
