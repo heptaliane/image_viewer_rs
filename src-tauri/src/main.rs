@@ -18,7 +18,8 @@ fn main() {
         .setup(move |app| match app.get_cli_matches() {
             Ok(matches) => match matches.args.get("filename").unwrap().value.clone() {
                 Value::String(filename) => {
-                    let state = state::ViewerState::new(&filename);
+                    let mut state = state::ViewerState::new(filename);
+                    state.reload_files();
                     app.manage(ViewerStateManager(Mutex::new(state)));
                     Ok(())
                 },
@@ -51,7 +52,7 @@ fn move_image_offset(
                     _ => return Err("No valid image left".to_string()),
                 }
                 match state.get() {
-                    Some(filename) => match image::try_get_source_image(filename) {
+                    Ok(path) => match image::try_get_source_image(path) {
                         Ok(img) => return Ok(img),
                         _ => (),
                     },

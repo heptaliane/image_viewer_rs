@@ -1,11 +1,11 @@
 use std::fs;
-use std::path::Path;
+use std::path::PathBuf;
 
 use base64;
 use mime;
 
-pub fn try_get_source_image(filename: &String) -> Result<String, String> {
-    match Path::new(filename).extension() {
+pub fn try_get_source_image(path: PathBuf) -> Result<String, String> {
+    match path.extension() {
         Some(ext) => {
             let mimetype: mime::Mime = match ext.to_ascii_lowercase().to_str().unwrap() {
                 "bmp" => mime::IMAGE_BMP,
@@ -18,7 +18,7 @@ pub fn try_get_source_image(filename: &String) -> Result<String, String> {
                 }
             };
 
-            match fs::read(filename) {
+            match fs::read(path.to_str().unwrap()) {
                 Ok(data) => {
                     let b64data = base64::encode(data);
                     Ok(format!("data:{};base64,{}", mimetype.to_string(), b64data))
