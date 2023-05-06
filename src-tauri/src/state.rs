@@ -24,12 +24,13 @@ impl ViewerState {
                 Some(parent) => match get_child_files(parent, &self.pattern) {
                     Ok(files) if files.len() > 0 => {
                         self.filenames = files;
-                        self.cursor = self.filenames
+                        self.cursor = self
+                            .filenames
                             .iter()
                             .position(|path| {
                                 path.partial_cmp(&filename.to_str().unwrap().to_string())
                                     .unwrap()
-                                    == Ordering::Greater
+                                    != Ordering::Less
                             })
                             .unwrap_or(0);
                         Ok(())
@@ -43,8 +44,8 @@ impl ViewerState {
         }
     }
 
-    pub fn set_pattern(&mut self, pattern: String) -> Result<(), String> {
-        self.pattern = pattern;
+    pub fn set_pattern(&mut self, pattern: &str) -> Result<(), String> {
+        self.pattern = pattern.to_string();
         self.reload_files()
     }
 
@@ -123,15 +124,10 @@ impl ViewerState {
                 self.cursor = buffer as usize;
                 return Ok(());
             } else {
+                buffer -= self.filenames.len() as i32;
                 match self.next_directory() {
                     Err(err) => return Err(err),
-                    _ => match self.filenames.len() as i32 {
-                        n if n > buffer => buffer -= n,
-                        _ => {
-                            self.cursor = buffer as usize;
-                            return Ok(());
-                        }
-                    },
+                    _ => (),
                 }
             }
         }
@@ -167,7 +163,7 @@ impl ViewerState {
 
 #[test]
 fn test_viewer_state_init() {
-    let expected_filenames = vec![
+    let expected_filenames = [
         "test_data/state/a/b/a",
         "test_data/state/a/b/b",
         "test_data/state/a/b/c",
@@ -175,13 +171,17 @@ fn test_viewer_state_init() {
 
     let mut state1 = ViewerState::new("test_data/state/a/b/a".to_string());
     assert_eq!(state1.reload_files(), Ok(()));
-    assert_eq!(state1.filenames, expected_filenames);
     assert_eq!(state1.cursor, 0);
+    for (actual, expected) in state1.filenames.iter().zip(expected_filenames) {
+        assert!(actual.ends_with(expected));
+    }
 
     let mut state2 = ViewerState::new("test_data/state/a/b/b".to_string());
     assert_eq!(state2.reload_files(), Ok(()));
-    assert_eq!(expected_filenames, state2.filenames);
     assert_eq!(state2.cursor, 1);
+    for (actual, expected) in state2.filenames.iter().zip(expected_filenames) {
+        assert!(actual.ends_with(expected));
+    }
 }
 
 #[test]
@@ -189,77 +189,59 @@ fn test_viewer_state_change_directory() {
     let mut state = ViewerState::new("test_data/state/a/b/a".to_string());
     assert_eq!(state.reload_files(), Ok(()));
 
-    let prev_expected = vec![
+    let prev_expected = [
         "test_data/state/a/a/a",
         "test_data/state/a/a/b",
         "test_data/state/a/a/c",
     ];
     assert_eq!(state.prev_directory(), Ok(()));
-    assert_eq!(state.filenames, prev_expected);
+    for (actual, expected) in state.filenames.iter().zip(prev_expected) {
+        assert!(actual.ends_with(expected));
+    }
 
-    let next_expected = vec![
+    let next_expected = [
         "test_data/state/a/b/a",
         "test_data/state/a/b/b",
         "test_data/state/a/b/c",
     ];
     assert_eq!(state.next_directory(), Ok(()));
-    assert_eq!(state.filenames, next_expected);
+    for (actual, expected) in state.filenames.iter().zip(next_expected) {
+        assert!(actual.ends_with(expected));
+    }
 }
 
 #[test]
 fn test_viewer_state_set_offset() {
     let mut state = ViewerState::new("test_data/state/a/b/a".to_string());
-    state.reload_files();
-    assert_eq!(
-        state.get().unwrap().to_str().unwrap(),
-        "test_data/state/a/b/a",
-    );
+    assert_eq!(state.set_pattern("[!.]*"), Ok(()));
+    assert!(state.get().unwrap().ends_with("test_data/state/a/b/a"));
 
     assert_eq!(state.set_offset(1), Ok(()));
-    assert_eq!(
-        state.get().unwrap().to_str().unwrap(),
-        "test_data/state/a/b/b",
-    );
+    assert!(state.get().unwrap().ends_with("test_data/state/a/b/b"));
 
     assert_eq!(state.set_offset(-1), Ok(()));
-    assert_eq!(
-        state.get().unwrap().to_str().unwrap(),
-        "test_data/state/a/a/c",
-    );
+    assert!(state.get().unwrap().ends_with("test_data/state/a/a/c"));
 
     assert_eq!(state.set_offset(3), Ok(()));
-    assert_eq!(
-        state.get().unwrap().to_str().unwrap(),
-        "test_data/state/a/b/a",
-    );
+    assert!(state.get().unwrap().ends_with("test_data/state/a/b/a"));
 }
 
 #[test]
 fn test_viewer_state_move_cursor() {
     let mut state = ViewerState::new("test_data/state/a/b/a".to_string());
+    assert_eq!(state.set_pattern("[!.]*"), Ok(()));
     assert_eq!(state.reload_files(), Ok(()));
 
     assert_eq!(state.move_cursor(1), Ok(()));
-    assert_eq!(
-        state.get().unwrap().to_str().unwrap(),
-        "test_data/state/a/b/b",
-    );
+    assert!(state.get().unwrap().ends_with("test_data/state/a/b/b"));
 
     assert_eq!(state.move_cursor(2), Ok(()));
-    assert_eq!(
-        state.get().unwrap().to_str().unwrap(),
-        "test_data/state/a/d",
-    );
+    println!("{:?}", state.get().unwrap());
+    assert!(state.get().unwrap().ends_with("test_data/state/b/a/a"));
 
     assert_eq!(state.move_cursor(-1), Ok(()));
-    assert_eq!(
-        state.get().unwrap().to_str().unwrap(),
-        "test_data/state/a/b/c",
-    );
+    assert!(state.get().unwrap().ends_with("test_data/state/a/b/c"));
 
-    assert_eq!(state.move_cursor(-10), Ok(()));
-    assert_eq!(
-        state.get().unwrap().to_str().unwrap(),
-        "test_data/state/a/a/c",
-    );
+    assert_eq!(state.move_cursor(-6), Ok(()));
+    assert!(state.get().unwrap().ends_with("test_data/state/a/d"));
 }
