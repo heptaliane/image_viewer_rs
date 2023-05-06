@@ -1,6 +1,6 @@
 use std::{cmp::Ordering, path::Path, path::PathBuf};
 
-use super::path::{get_child_files, next_directory, prev_directory};
+use super::path::{get_abspath, get_child_files, next_directory, prev_directory};
 
 #[derive(Default)]
 pub struct ViewerState {
@@ -51,7 +51,7 @@ impl ViewerState {
 
     pub fn get(&self) -> Result<PathBuf, String> {
         match self.filenames.get(self.cursor) {
-            Some(filename) => match Path::new(&filename).canonicalize() {
+            Some(filename) => match get_abspath(&Path::new(&filename)) {
                 Ok(abspath) => Ok(abspath),
                 Err(err) => Err(format!("{:?}", err)),
             },

@@ -1,6 +1,18 @@
-use glob::glob;
 use std::cmp::Ordering;
+use std::env::current_dir;
 use std::path::{Path, PathBuf};
+
+use glob::glob;
+
+pub fn get_abspath(path: &Path) -> Result<PathBuf, String> {
+    match path.is_relative() {
+        true => match current_dir() {
+            Ok(base_dir) => Ok(base_dir.join(path)),
+            Err(err) => Err(format!("{:?}", err)),
+        },
+        false => Ok(path.to_path_buf()),
+    }
+}
 
 fn get_children<F>(parent: &Path, pattern: &str, predicate: F) -> Result<Vec<String>, String>
 where
