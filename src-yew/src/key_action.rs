@@ -8,6 +8,8 @@ use super::command;
 enum KeyAction {
     NextImage,
     PrevImage,
+    NextDirectory,
+    PrevDirectory,
 }
 
 impl KeyAction {
@@ -15,14 +17,18 @@ impl KeyAction {
         match self {
             KeyAction::NextImage => "NEXT_IMAGE",
             KeyAction::PrevImage => "PREV_IMAGE",
+            KeyAction::NextDirectory => "NEXT_DIRECTORY",
+            KeyAction::PrevDirectory => "PREV_DIRECTORY",
         }
         .to_string()
     }
 }
 
-const KEY_ACTION_MAP: [(KeyAction, &dyn Fn(Callback<String>) -> ()); 2] = [
+const KEY_ACTION_MAP: [(KeyAction, &dyn Fn(Callback<String>) -> ()); 4] = [
     (KeyAction::NextImage, &command::fetch_next_image_source),
     (KeyAction::PrevImage, &command::fetch_prev_image_source),
+    (KeyAction::NextDirectory, &command::fetch_next_directory),
+    (KeyAction::PrevDirectory, &command::fetch_prev_directory),
 ];
 
 pub fn create_keymap(
