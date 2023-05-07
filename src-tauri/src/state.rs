@@ -1,4 +1,6 @@
-use std::{cmp::Ordering, collections::HashSet, path::Path, path::PathBuf};
+use std::cmp::Ordering;
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 
 use super::path::{get_child_files, next_directory, prev_directory};
 
@@ -84,7 +86,6 @@ impl ViewerState {
                             match get_child_files(&current, &self.extensions, &sort_by_path) {
                                 Ok(paths) if paths.len() > 0 => {
                                     self.paths = paths;
-                                    self.cursor = 0;
                                     return Ok(());
                                 }
                                 Err(err) => return Err(err),
@@ -100,43 +101,43 @@ impl ViewerState {
     }
 
     pub fn next_directory(&mut self) -> Result<(), String> {
-        self.change_directory(|p| next_directory(p, &sort_by_path))
-    }
-
-    pub fn prev_directory(&mut self) -> Result<(), String> {
-        self.change_directory(|p| prev_directory(p, &sort_by_path))
-    }
-
-    pub fn set_offset(&mut self, offset: i32) -> Result<(), String> {
-        let mut buffer = offset;
-        loop {
-            log::debug!("Updating cursor (offset = {:?})", buffer);
-            if buffer < 0 {
-                match self.prev_directory() {
-                    Err(err) => return Err(err),
-                    _ => match self.paths.len() as i32 {
-                        n if n + buffer < 0 => buffer += n,
-                        n => {
-                            self.cursor = (n + buffer) as usize;
-                            return Ok(());
-                        }
-                    },
-                }
-            } else if (buffer as usize) < self.paths.len() {
-                self.cursor = buffer as usize;
-                return Ok(());
-            } else {
-                buffer -= self.paths.len() as i32;
-                match self.next_directory() {
-                    Err(err) => return Err(err),
-                    _ => (),
-                }
+        match self.change_directory(|p| next_directory(p, &sort_by_path)) {
+            Ok(_) => {
+                self.move_first();
+                Ok(())
             }
+            Err(err) => Err(err),
         }
     }
 
-    pub fn move_cursor(&mut self, moves: i32) -> Result<(), String> {
-        self.set_offset((self.cursor as i32) + moves)
+    pub fn prev_directory(&mut self) -> Result<(), String> {
+        match self.change_directory(|p| prev_directory(p, &sort_by_path)) {
+            Ok(_) => {
+                self.move_last();
+                Ok(())
+            }
+            Err(err) => Err(err),
+        }
+    }
+
+    pub fn next_cursor(&mut self) -> Result<(), String> {
+        match self.cursor + 1 < self.paths.len() {
+            true => {
+                self.cursor += 1;
+                Ok(())
+            }
+            false => self.next_directory(),
+        }
+    }
+
+    pub fn prev_cursor(&mut self) -> Result<(), String> {
+        match self.cursor > 0 {
+            true => {
+                self.cursor -= 1;
+                Ok(())
+            }
+            false => self.prev_directory(),
+        }
     }
 
     pub fn move_first(&mut self) {
@@ -223,39 +224,59 @@ fn test_viewer_state_change_directory() {
 }
 
 #[test]
-fn test_viewer_state_set_offset() {
+fn test_viewer_state_next_cursor() {
     let extensions = HashSet::from([String::from("txt")]);
-    let mut state = ViewerState::new("test_data/state/a/b/a.txt", extensions);
+    let mut state = ViewerState::new("test_data/state/a/a/b.txt", extensions);
     assert_eq!(state.reload_files(), Ok(()));
-    assert!(state.get().unwrap().ends_with("test_data/state/a/b/a.txt"));
 
-    assert_eq!(state.set_offset(1), Ok(()));
-    assert!(state.get().unwrap().ends_with("test_data/state/a/b/b.txt"));
+    assert!(state.next_cursor().is_ok());
+    assert_eq!(
+        state.get().unwrap(),
+        Path::new("test_data/state/a/a/c.txt").to_path_buf()
+    );
 
-    assert_eq!(state.set_offset(-1), Ok(()));
-    assert!(state.get().unwrap().ends_with("test_data/state/a/a/c.txt"));
+    assert!(state.next_cursor().is_ok());
+    assert_eq!(
+        state.get().unwrap(),
+        Path::new("test_data/state/a/b/a.txt").to_path_buf()
+    );
 
-    assert_eq!(state.set_offset(3), Ok(()));
-    assert!(state.get().unwrap().ends_with("test_data/state/a/b/a.txt"));
+    assert!(state.next_cursor().is_ok());  // a/b/b
+    assert!(state.next_cursor().is_ok());  // a/b/c
+    assert!(state.next_cursor().is_ok());  // b/a/a
+    assert_eq!(
+        state.get().unwrap(),
+        Path::new("test_data/state/b/a/a.txt").to_path_buf()
+    );
 }
 
 #[test]
-fn test_viewer_state_move_cursor() {
+fn test_viewer_state_prev_cursor() {
     let extensions = HashSet::from([String::from("txt")]);
-    let mut state = ViewerState::new("test_data/state/a/b/a.txt", extensions);
+    let mut state = ViewerState::new("test_data/state/b/a/a.txt", extensions);
     assert_eq!(state.reload_files(), Ok(()));
 
-    assert_eq!(state.move_cursor(1), Ok(()));
-    assert!(state.get().unwrap().ends_with("test_data/state/a/b/b.txt"));
+    assert!(state.prev_cursor().is_ok());
+    assert_eq!(
+        state.get().unwrap(),
+        Path::new("test_data/state/a/b/c.txt").to_path_buf()
+    );
 
-    assert_eq!(state.move_cursor(2), Ok(()));
-    assert!(state.get().unwrap().ends_with("test_data/state/b/a/a.txt"));
+    assert!(state.prev_cursor().is_ok());
+    assert_eq!(
+        state.get().unwrap(),
+        Path::new("test_data/state/a/b/b.txt").to_path_buf()
+    );
 
-    assert_eq!(state.move_cursor(-1), Ok(()));
-    assert!(state.get().unwrap().ends_with("test_data/state/a/b/c.txt"));
-
-    assert_eq!(state.move_cursor(-6), Ok(()));
-    assert!(state.get().unwrap().ends_with("test_data/state/a/d.txt"));
+    assert!(state.prev_cursor().is_ok());  // a/b/a
+    assert!(state.prev_cursor().is_ok());  // a/a/c
+    assert!(state.prev_cursor().is_ok());  // a/a/b
+    assert!(state.prev_cursor().is_ok());  // a/a/a
+    assert!(state.prev_cursor().is_ok());  // a/d
+    assert_eq!(
+        state.get().unwrap(),
+        Path::new("test_data/state/a/d.txt").to_path_buf()
+    );
 }
 
 #[test]
