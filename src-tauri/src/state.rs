@@ -138,6 +138,14 @@ impl ViewerState {
     pub fn move_cursor(&mut self, moves: i32) -> Result<(), String> {
         self.set_offset((self.cursor as i32) + moves)
     }
+
+    pub fn move_first(&mut self) {
+        self.cursor = 0;
+    }
+
+    pub fn move_last(&mut self) {
+        self.cursor = self.paths.len() - 1;
+    }
 }
 
 /*
@@ -241,7 +249,6 @@ fn test_viewer_state_move_cursor() {
     assert!(state.get().unwrap().ends_with("test_data/state/a/b/b.txt"));
 
     assert_eq!(state.move_cursor(2), Ok(()));
-    println!("{:?}", state.get().unwrap());
     assert!(state.get().unwrap().ends_with("test_data/state/b/a/a.txt"));
 
     assert_eq!(state.move_cursor(-1), Ok(()));
@@ -249,4 +256,68 @@ fn test_viewer_state_move_cursor() {
 
     assert_eq!(state.move_cursor(-6), Ok(()));
     assert!(state.get().unwrap().ends_with("test_data/state/a/d.txt"));
+}
+
+#[test]
+fn test_viewer_state_move_first() {
+    let extensions = HashSet::from([String::from("txt")]);
+
+    let mut state1 = ViewerState::new("test_data/state/a/b/a.txt", extensions.clone());
+    assert_eq!(state1.reload_files(), Ok(()));
+
+    state1.move_first();
+    assert_eq!(
+        state1.get(),
+        Ok(Path::new("test_data/state/a/b/a.txt").to_path_buf())
+    );
+
+    let mut state2 = ViewerState::new("test_data/state/a/b/b.txt", extensions.clone());
+    assert_eq!(state2.reload_files(), Ok(()));
+
+    state2.move_first();
+    assert_eq!(
+        state2.get(),
+        Ok(Path::new("test_data/state/a/b/a.txt").to_path_buf())
+    );
+
+    let mut state3 = ViewerState::new("test_data/state/a/b/c.txt", extensions.clone());
+    assert_eq!(state3.reload_files(), Ok(()));
+
+    state3.move_first();
+    assert_eq!(
+        state3.get(),
+        Ok(Path::new("test_data/state/a/b/a.txt").to_path_buf())
+    );
+}
+
+#[test]
+fn test_viewer_state_move_last() {
+    let extensions = HashSet::from([String::from("txt")]);
+
+    let mut state1 = ViewerState::new("test_data/state/a/a/a.txt", extensions.clone());
+    assert_eq!(state1.reload_files(), Ok(()));
+
+    state1.move_last();
+    assert_eq!(
+        state1.get(),
+        Ok(Path::new("test_data/state/a/a/c.txt").to_path_buf())
+    );
+
+    let mut state2 = ViewerState::new("test_data/state/a/a/b.txt", extensions.clone());
+    assert_eq!(state2.reload_files(), Ok(()));
+
+    state2.move_last();
+    assert_eq!(
+        state2.get(),
+        Ok(Path::new("test_data/state/a/a/c.txt").to_path_buf())
+    );
+
+    let mut state3 = ViewerState::new("test_data/state/a/a/c.txt", extensions.clone());
+    assert_eq!(state3.reload_files(), Ok(()));
+
+    state3.move_last();
+    assert_eq!(
+        state3.get(),
+        Ok(Path::new("test_data/state/a/a/c.txt").to_path_buf())
+    );
 }
