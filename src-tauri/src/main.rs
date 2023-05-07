@@ -3,6 +3,7 @@
     windows_subsystem = "windows"
 )]
 
+use env_logger;
 use serde_json::Value;
 use std::{collections::HashSet, sync::Mutex};
 use tauri::{Manager, State};
@@ -16,6 +17,7 @@ static AVAILABLE_EXTENSIONS: [&str; 5] = ["bmp", "jpg", "jpeg", "png", "gif"];
 struct ViewerStateManager(Mutex<state::ViewerState>);
 
 fn main() {
+    env_logger::init();
     tauri::Builder::default()
         .setup(move |app| match app.get_cli_matches() {
             Ok(matches) => match matches.args.get("filename").unwrap().value.clone() {
@@ -54,13 +56,13 @@ fn move_image_offset(
                     _ => return Err("No valid image left".to_string()),
                 }
                 match state.get() {
-                    Ok(path) => {
-                        println!("{:?}", path);
-                        match image::try_get_source_image(path) {
-                            Ok(img) => return Ok(img),
-                            Err(err) => return Err(err),
+                    Ok(path) => match image::try_get_source_image(&path) {
+                        Ok(img) => {
+                            log::debug!("Current image: {:?}", path);
+                            return Ok(img);
                         }
-                    }
+                        Err(err) => return Err(err),
+                    },
                     _ => return Err("No valid image left".to_string()),
                 }
             },

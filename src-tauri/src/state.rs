@@ -15,6 +15,9 @@ pub struct ViewerState {
 
 impl ViewerState {
     pub fn new(filename: &str, extensions: HashSet<String>) -> Self {
+        log::debug!("Initialized state with {:?}", filename);
+        log::info!("Available extensions: {:?}", extensions);
+
         Self {
             paths: vec![Path::new(filename).to_path_buf()],
             cursor: 0,
@@ -33,6 +36,11 @@ impl ViewerState {
                             .iter()
                             .position(|path| path.partial_cmp(&current).unwrap() != Ordering::Less)
                             .unwrap_or(0);
+                        log::debug!(
+                            "File list updated ({:?} files, cursor = {:?})",
+                            self.paths.len(),
+                            self.cursor
+                        );
                         Ok(())
                     }
                     Err(err) => Err(err),
@@ -69,6 +77,7 @@ impl ViewerState {
             Ok(parent) => {
                 let mut current = parent.clone();
                 loop {
+                    log::debug!("Changing directory (current target: {:?})", current);
                     match modifier(&current) {
                         Some(dirname) => {
                             current = PathBuf::from(&dirname);
@@ -101,6 +110,7 @@ impl ViewerState {
     pub fn set_offset(&mut self, offset: i32) -> Result<(), String> {
         let mut buffer = offset;
         loop {
+            log::debug!("Updating cursor (offset = {:?})", buffer);
             if buffer < 0 {
                 match self.prev_directory() {
                     Err(err) => return Err(err),

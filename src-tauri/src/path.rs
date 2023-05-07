@@ -22,6 +22,7 @@ where
                 .filter(predicate)
                 .collect();
             paths.sort_unstable_by(|p1, p2| sort_elem(p1).partial_cmp(&sort_elem(p2)).unwrap());
+            log::debug!("{:?} entries are found in {:?}", paths.len(), parent);
             Ok(paths)
         }
         Err(err) => Err(err.to_string()),
@@ -66,6 +67,8 @@ where
     F: Fn(&PathBuf) -> T,
     T: Ord,
 {
+    log::debug!("Explore next directory for {:?}", path);
+
     if let Ok(dirs) = get_child_directories(&path, sort_elem) {
         if let Some(next_dir) = VecDeque::from(dirs).pop_front() {
             return Some(next_dir);
@@ -95,6 +98,8 @@ where
     F: Fn(&PathBuf) -> T,
     T: Ord,
 {
+    log::debug!("Explore prev directory for {:?}", path);
+
     if let Some(parent) = path.parent() {
         match get_child_directories(&parent, sort_elem) {
             Ok(mut dirs) => {

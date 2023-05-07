@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use base64;
 use mime;
 
-pub fn try_get_source_image(path: PathBuf) -> Result<String, String> {
+pub fn try_get_source_image(path: &PathBuf) -> Result<String, String> {
     match path.extension() {
         Some(ext) => {
             let mimetype: mime::Mime = match ext.to_ascii_lowercase().to_str().unwrap() {
