@@ -1,6 +1,6 @@
 use std::{cmp::Ordering, collections::HashSet, path::Path, path::PathBuf};
 
-use super::path::{get_abspath, get_child_files, next_directory, prev_directory};
+use super::path::{get_child_files, next_directory, prev_directory};
 
 fn sort_by_path(path: &PathBuf) -> PathBuf {
     path.clone()
@@ -25,25 +25,19 @@ impl ViewerState {
     pub fn reload_files(&mut self) -> Result<(), String> {
         match self.get() {
             Ok(current) => match current.parent() {
-                Some(parent) => {
-                    match get_child_files(parent, &self.extensions, &sort_by_path) {
-                        Ok(paths) if paths.len() > 0 => {
-                            self.paths = paths;
-                            self.cursor = self
-                                .paths
-                                .iter()
-                                .position(|path| {
-                                    path.partial_cmp(&current)
-                                        .unwrap()
-                                        != Ordering::Less
-                                })
-                                .unwrap_or(0);
-                            Ok(())
-                        }
-                        Err(err) => Err(err),
-                        _ => self.prev_directory(),
+                Some(parent) => match get_child_files(parent, &self.extensions, &sort_by_path) {
+                    Ok(paths) if paths.len() > 0 => {
+                        self.paths = paths;
+                        self.cursor = self
+                            .paths
+                            .iter()
+                            .position(|path| path.partial_cmp(&current).unwrap() != Ordering::Less)
+                            .unwrap_or(0);
+                        Ok(())
                     }
-                }
+                    Err(err) => Err(err),
+                    _ => self.prev_directory(),
+                },
                 None => Err("Parent directory is not found.".to_string()),
             },
             Err(err) => Err(err),
@@ -52,10 +46,7 @@ impl ViewerState {
 
     pub fn get(&self) -> Result<PathBuf, String> {
         match self.paths.get(self.cursor) {
-            Some(filename) => match get_abspath(&Path::new(&filename)) {
-                Ok(abspath) => Ok(abspath),
-                Err(err) => Err(format!("{:?}", err)),
-            },
+            Some(path) => Ok(path.clone()),
             _ => Err(String::from("Files are not in buffer.")),
         }
     }
