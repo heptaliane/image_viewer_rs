@@ -2,6 +2,7 @@ use std::boxed::Box;
 use std::collections::HashMap;
 
 use yew::prelude::*;
+use web_sys::window;
 
 use super::command;
 
@@ -10,6 +11,7 @@ enum KeyAction {
     PrevImage,
     NextDirectory,
     PrevDirectory,
+    Quit,
 }
 
 impl KeyAction {
@@ -19,16 +21,24 @@ impl KeyAction {
             KeyAction::PrevImage => "PREV_IMAGE",
             KeyAction::NextDirectory => "NEXT_DIRECTORY",
             KeyAction::PrevDirectory => "PREV_DIRECTORY",
+            KeyAction::Quit => "QUIT",
         }
         .to_string()
     }
 }
 
-const KEY_ACTION_MAP: [(KeyAction, &dyn Fn(Callback<String>) -> ()); 4] = [
+pub fn close_window(_: Callback<String>) {
+    if let Err(err) = window().unwrap().close() {
+        log::info!("{:?}", err);
+    }
+}
+
+const KEY_ACTION_MAP: [(KeyAction, &dyn Fn(Callback<String>) -> ()); 5] = [
     (KeyAction::NextImage, &command::fetch_next_image_source),
     (KeyAction::PrevImage, &command::fetch_prev_image_source),
     (KeyAction::NextDirectory, &command::fetch_next_directory),
     (KeyAction::PrevDirectory, &command::fetch_prev_directory),
+    (KeyAction::Quit, &close_window),
 ];
 
 pub fn create_keymap(

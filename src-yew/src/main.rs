@@ -11,7 +11,7 @@ use yew::prelude::*;
 mod command;
 mod key_action;
 
-const DEFAULT_KEYMAP: [(&str, &str); 8] = [
+const DEFAULT_KEYMAP: [(&str, &str); 9] = [
     ("ArrowRight", "NEXT_IMAGE"),
     ("l", "NEXT_IMAGE"),
     ("ArrowLeft", "PREV_IMAGE"),
@@ -20,6 +20,7 @@ const DEFAULT_KEYMAP: [(&str, &str); 8] = [
     ("k", "PREV_DIRECTORY"),
     ("ArrowDown", "NEXT_DIRECTORY"),
     ("j", "NEXT_DIRECTORY"),
+    ("q", "QUIT"),
 ];
 
 enum ImageViewMsg {
