@@ -8,6 +8,7 @@ use wasm_logger;
 use web_sys::KeyboardEvent;
 use yew::prelude::*;
 
+mod command;
 mod key_action;
 
 const DEFAULT_KEYMAP: [(&str, &str); 4] = [
@@ -80,7 +81,7 @@ impl Component for ImageViewModel {
             let set_source = ctx
                 .link()
                 .callback(|src: String| Self::Message::OnSourceChange(src));
-            key_action::fetch_current_image_source(set_source);
+            command::fetch_current_image_source(set_source);
 
             // Set key event listener
             let document = gloo::utils::document();

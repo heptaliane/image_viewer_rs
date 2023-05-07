@@ -40,7 +40,12 @@ fn main() {
             },
             Err(err) => Err(err.into()),
         })
-        .invoke_handler(tauri::generate_handler![command::move_image_offset])
+        .invoke_handler(tauri::generate_handler![
+            command::next_image,
+            command::prev_image,
+            command::next_directory,
+            command::prev_directory,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
