@@ -14,7 +14,7 @@ pub fn try_get_source_image(path: PathBuf) -> Result<String, String> {
                 "png" => mime::IMAGE_PNG,
                 "gif" => mime::IMAGE_GIF,
                 _ => {
-                    return Err(format!("Unsupported file: {}", ext.to_str().unwrap()));
+                    return Err(format!("Unsupported file: {:?}", path));
                 }
             };
 

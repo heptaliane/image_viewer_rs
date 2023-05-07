@@ -1,56 +1,57 @@
-use std::{cmp::Ordering, path::Path, path::PathBuf};
+use std::{cmp::Ordering, collections::HashSet, path::Path, path::PathBuf};
 
 use super::path::{get_abspath, get_child_files, next_directory, prev_directory};
 
+fn sort_by_path(path: &PathBuf) -> PathBuf {
+    path.clone()
+}
+
 #[derive(Default)]
 pub struct ViewerState {
-    filenames: Vec<String>,
+    paths: Vec<PathBuf>,
     cursor: usize,
-    pattern: String,
+    extensions: HashSet<String>,
 }
 
 impl ViewerState {
-    pub fn new(filename: String) -> Self {
+    pub fn new(filename: &str, extensions: HashSet<String>) -> Self {
         Self {
-            filenames: vec![filename],
+            paths: vec![Path::new(filename).to_path_buf()],
             cursor: 0,
-            pattern: String::from("*"),
+            extensions,
         }
     }
 
     pub fn reload_files(&mut self) -> Result<(), String> {
         match self.get() {
-            Ok(filename) => match filename.parent() {
-                Some(parent) => match get_child_files(parent, &self.pattern) {
-                    Ok(files) if files.len() > 0 => {
-                        self.filenames = files;
-                        self.cursor = self
-                            .filenames
-                            .iter()
-                            .position(|path| {
-                                path.partial_cmp(&filename.to_str().unwrap().to_string())
-                                    .unwrap()
-                                    != Ordering::Less
-                            })
-                            .unwrap_or(0);
-                        Ok(())
+            Ok(current) => match current.parent() {
+                Some(parent) => {
+                    match get_child_files(parent, &self.extensions, &sort_by_path) {
+                        Ok(paths) if paths.len() > 0 => {
+                            self.paths = paths;
+                            self.cursor = self
+                                .paths
+                                .iter()
+                                .position(|path| {
+                                    path.partial_cmp(&current)
+                                        .unwrap()
+                                        != Ordering::Less
+                                })
+                                .unwrap_or(0);
+                            Ok(())
+                        }
+                        Err(err) => Err(err),
+                        _ => self.prev_directory(),
                     }
-                    Err(err) => Err(err),
-                    _ => self.prev_directory(),
-                },
+                }
                 None => Err("Parent directory is not found.".to_string()),
             },
             Err(err) => Err(err),
         }
     }
 
-    pub fn set_pattern(&mut self, pattern: &str) -> Result<(), String> {
-        self.pattern = pattern.to_string();
-        self.reload_files()
-    }
-
     pub fn get(&self) -> Result<PathBuf, String> {
-        match self.filenames.get(self.cursor) {
+        match self.paths.get(self.cursor) {
             Some(filename) => match get_abspath(&Path::new(&filename)) {
                 Ok(abspath) => Ok(abspath),
                 Err(err) => Err(format!("{:?}", err)),
@@ -71,7 +72,7 @@ impl ViewerState {
 
     fn change_directory<F>(&mut self, modifier: F) -> Result<(), String>
     where
-        F: Fn(&Path) -> Option<String>,
+        F: Fn(&PathBuf) -> Option<PathBuf>,
     {
         match self.parent_dir() {
             Ok(parent) => {
@@ -80,9 +81,9 @@ impl ViewerState {
                     match modifier(&current) {
                         Some(dirname) => {
                             current = PathBuf::from(&dirname);
-                            match get_child_files(&current, &self.pattern) {
-                                Ok(files) if files.len() > 0 => {
-                                    self.filenames = files;
+                            match get_child_files(&current, &self.extensions, &sort_by_path) {
+                                Ok(paths) if paths.len() > 0 => {
+                                    self.paths = paths;
                                     self.cursor = 0;
                                     return Ok(());
                                 }
@@ -99,11 +100,11 @@ impl ViewerState {
     }
 
     pub fn next_directory(&mut self) -> Result<(), String> {
-        self.change_directory(next_directory)
+        self.change_directory(|p| next_directory(p, &sort_by_path))
     }
 
     pub fn prev_directory(&mut self) -> Result<(), String> {
-        self.change_directory(prev_directory)
+        self.change_directory(|p| prev_directory(p, &sort_by_path))
     }
 
     pub fn set_offset(&mut self, offset: i32) -> Result<(), String> {
@@ -112,7 +113,7 @@ impl ViewerState {
             if buffer < 0 {
                 match self.prev_directory() {
                     Err(err) => return Err(err),
-                    _ => match self.filenames.len() as i32 {
+                    _ => match self.paths.len() as i32 {
                         n if n + buffer < 0 => buffer += n,
                         n => {
                             self.cursor = (n + buffer) as usize;
@@ -120,11 +121,11 @@ impl ViewerState {
                         }
                     },
                 }
-            } else if (buffer as usize) < self.filenames.len() {
+            } else if (buffer as usize) < self.paths.len() {
                 self.cursor = buffer as usize;
                 return Ok(());
             } else {
-                buffer -= self.filenames.len() as i32;
+                buffer -= self.paths.len() as i32;
                 match self.next_directory() {
                     Err(err) => return Err(err),
                     _ => (),
@@ -163,85 +164,88 @@ impl ViewerState {
 
 #[test]
 fn test_viewer_state_init() {
+    let extensions = HashSet::from([String::from("txt")]);
     let expected_filenames = [
-        "test_data/state/a/b/a",
-        "test_data/state/a/b/b",
-        "test_data/state/a/b/c",
+        "test_data/state/a/b/a.txt",
+        "test_data/state/a/b/b.txt",
+        "test_data/state/a/b/c.txt",
     ];
 
-    let mut state1 = ViewerState::new("test_data/state/a/b/a".to_string());
+    let mut state1 = ViewerState::new("test_data/state/a/b/a.txt", extensions.clone());
     assert_eq!(state1.reload_files(), Ok(()));
     assert_eq!(state1.cursor, 0);
-    for (actual, expected) in state1.filenames.iter().zip(expected_filenames) {
+    for (actual, expected) in state1.paths.iter().zip(expected_filenames) {
         assert!(actual.ends_with(expected));
     }
 
-    let mut state2 = ViewerState::new("test_data/state/a/b/b".to_string());
+    let mut state2 = ViewerState::new("test_data/state/a/b/b.txt", extensions.clone());
     assert_eq!(state2.reload_files(), Ok(()));
     assert_eq!(state2.cursor, 1);
-    for (actual, expected) in state2.filenames.iter().zip(expected_filenames) {
+    for (actual, expected) in state2.paths.iter().zip(expected_filenames) {
         assert!(actual.ends_with(expected));
     }
 }
 
 #[test]
 fn test_viewer_state_change_directory() {
-    let mut state = ViewerState::new("test_data/state/a/b/a".to_string());
+    let extensions = HashSet::from([String::from("txt")]);
+    let mut state = ViewerState::new("test_data/state/a/b/a.txt", extensions);
     assert_eq!(state.reload_files(), Ok(()));
 
     let prev_expected = [
-        "test_data/state/a/a/a",
-        "test_data/state/a/a/b",
-        "test_data/state/a/a/c",
+        "test_data/state/a/a/a.txt",
+        "test_data/state/a/a/b.txt",
+        "test_data/state/a/a/c.txt",
     ];
     assert_eq!(state.prev_directory(), Ok(()));
-    for (actual, expected) in state.filenames.iter().zip(prev_expected) {
+    for (actual, expected) in state.paths.iter().zip(prev_expected) {
         assert!(actual.ends_with(expected));
     }
 
     let next_expected = [
-        "test_data/state/a/b/a",
-        "test_data/state/a/b/b",
-        "test_data/state/a/b/c",
+        "test_data/state/a/b/a.txt",
+        "test_data/state/a/b/b.txt",
+        "test_data/state/a/b/c.txt",
     ];
     assert_eq!(state.next_directory(), Ok(()));
-    for (actual, expected) in state.filenames.iter().zip(next_expected) {
+    for (actual, expected) in state.paths.iter().zip(next_expected) {
         assert!(actual.ends_with(expected));
     }
 }
 
 #[test]
 fn test_viewer_state_set_offset() {
-    let mut state = ViewerState::new("test_data/state/a/b/a".to_string());
-    assert_eq!(state.set_pattern("[!.]*"), Ok(()));
-    assert!(state.get().unwrap().ends_with("test_data/state/a/b/a"));
+    let extensions = HashSet::from([String::from("txt")]);
+    let mut state = ViewerState::new("test_data/state/a/b/a.txt", extensions);
+    assert_eq!(state.reload_files(), Ok(()));
+    assert!(state.get().unwrap().ends_with("test_data/state/a/b/a.txt"));
 
     assert_eq!(state.set_offset(1), Ok(()));
-    assert!(state.get().unwrap().ends_with("test_data/state/a/b/b"));
+    assert!(state.get().unwrap().ends_with("test_data/state/a/b/b.txt"));
 
     assert_eq!(state.set_offset(-1), Ok(()));
-    assert!(state.get().unwrap().ends_with("test_data/state/a/a/c"));
+    assert!(state.get().unwrap().ends_with("test_data/state/a/a/c.txt"));
 
     assert_eq!(state.set_offset(3), Ok(()));
-    assert!(state.get().unwrap().ends_with("test_data/state/a/b/a"));
+    assert!(state.get().unwrap().ends_with("test_data/state/a/b/a.txt"));
 }
 
 #[test]
 fn test_viewer_state_move_cursor() {
-    let mut state = ViewerState::new("test_data/state/a/b/a".to_string());
-    assert_eq!(state.set_pattern("[!.]*"), Ok(()));
+    let extensions = HashSet::from([String::from("txt")]);
+    let mut state = ViewerState::new("test_data/state/a/b/a.txt", extensions);
     assert_eq!(state.reload_files(), Ok(()));
 
     assert_eq!(state.move_cursor(1), Ok(()));
-    assert!(state.get().unwrap().ends_with("test_data/state/a/b/b"));
+    assert!(state.get().unwrap().ends_with("test_data/state/a/b/b.txt"));
 
     assert_eq!(state.move_cursor(2), Ok(()));
     println!("{:?}", state.get().unwrap());
-    assert!(state.get().unwrap().ends_with("test_data/state/b/a/a"));
+    assert!(state.get().unwrap().ends_with("test_data/state/b/a/a.txt"));
 
     assert_eq!(state.move_cursor(-1), Ok(()));
-    assert!(state.get().unwrap().ends_with("test_data/state/a/b/c"));
+    assert!(state.get().unwrap().ends_with("test_data/state/a/b/c.txt"));
 
     assert_eq!(state.move_cursor(-6), Ok(()));
-    assert!(state.get().unwrap().ends_with("test_data/state/a/d"));
+    assert!(state.get().unwrap().ends_with("test_data/state/a/d.txt"));
 }

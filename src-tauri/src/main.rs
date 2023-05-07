@@ -3,13 +3,15 @@
     windows_subsystem = "windows"
 )]
 
-use std::sync::Mutex;
-use tauri::{Manager, State};
 use serde_json::Value;
+use std::{collections::HashSet, sync::Mutex};
+use tauri::{Manager, State};
 
 mod image;
-mod state;
 mod path;
+mod state;
+
+static AVAILABLE_EXTENSIONS: [&str; 5] = ["bmp", "jpg", "jpeg", "png", "gif"];
 
 struct ViewerStateManager(Mutex<state::ViewerState>);
 
@@ -18,21 +20,21 @@ fn main() {
         .setup(move |app| match app.get_cli_matches() {
             Ok(matches) => match matches.args.get("filename").unwrap().value.clone() {
                 Value::String(filename) => {
-                    let mut state = state::ViewerState::new(filename);
-                    state.reload_files();
-                    app.manage(ViewerStateManager(Mutex::new(state)));
-                    Ok(())
-                },
-                _ => {
-                    let msg = "Filename is required.";
-                    println!("{:?}", msg);
-                    Err(msg.into())
+                    let mut state = state::ViewerState::new(
+                        &filename,
+                        HashSet::from(AVAILABLE_EXTENSIONS.map(|s| s.to_string())),
+                    );
+                    match state.reload_files() {
+                        Ok(_) => {
+                            app.manage(ViewerStateManager(Mutex::new(state)));
+                            Ok(())
+                        }
+                        Err(err) => Err(err.into()),
+                    }
                 }
+                _ => Err("Filename is required".into()),
             },
-            Err(err) => {
-                println!("{:?}", err.to_string());
-                Err(err.into())
-            }
+            Err(err) => Err(err.into()),
         })
         .invoke_handler(tauri::generate_handler![move_image_offset])
         .run(tauri::generate_context!())
@@ -52,10 +54,13 @@ fn move_image_offset(
                     _ => return Err("No valid image left".to_string()),
                 }
                 match state.get() {
-                    Ok(path) => match image::try_get_source_image(path) {
-                        Ok(img) => return Ok(img),
-                        _ => (),
-                    },
+                    Ok(path) => {
+                        println!("{:?}", path);
+                        match image::try_get_source_image(path) {
+                            Ok(img) => return Ok(img),
+                            Err(err) => return Err(err),
+                        }
+                    }
                     _ => return Err("No valid image left".to_string()),
                 }
             },

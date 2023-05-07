@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::collections::VecDeque;
-use std::fs::{read_dir};
+use std::fs::read_dir;
 use std::path::{Path, PathBuf};
 
 use std::env::current_dir;
@@ -55,7 +55,7 @@ where
             path.is_file()
                 && match path.extension() {
                     Some(ext) => match ext.to_str() {
-                        Some(extension) => extensions.contains(&extension.to_string()),
+                        Some(extension) => extensions.contains(&extension.to_ascii_lowercase()),
                         _ => false,
                     },
                     _ => false,
